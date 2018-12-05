@@ -1,10 +1,15 @@
-// Timer code
-// Credits to: L. Kiser
-// April 17, 2018
-
-#include "Timing.h"
+#include "startup.h"
 
 static uintptr_t d_i_o_port_a_handle ;	// digital I/O port handle
+
+int start(void){
+	// start
+	set_system_clock_period();
+	setup_dio();
+	setup_timer();
+	//go to infinite loop
+	master_loop();
+}
 
 // This function changes the QNX system clock tick size to just 100 microseconds.
 static void set_system_clock_period(void)

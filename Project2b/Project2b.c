@@ -1,7 +1,10 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "startup.h"
 
 int main(int argc, char *argv[]) {
-	printf("Welcome to the QNX Momentics IDE\n");
+	printf("Hello, Welcome to Servo Fun!\n");
+	start();
 	return EXIT_SUCCESS;
 }
