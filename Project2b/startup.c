@@ -1,70 +1,47 @@
 #include "startup.h"
 
 static uintptr_t d_i_o_port_a_handle ;	// digital I/O port handle
+static Servo left;
+static Servo right;
 
 int start(void){
-	// start
+	int privity_err;
+	privity_err = ThreadCtl(_NTO_TCTL_IO, NULL);
+	if (privity_err == -1)
+	{
+		fprintf(stderr, "can't get root permissions\n");
+		return -1 ;
+	}
 	set_system_clock_period();
 	setup_dio();
-	setup_timer();
-	//go to infinite loop
-	master_loop();
-}
 
-// This function changes the QNX system clock tick size to just 100 microseconds.
-static void set_system_clock_period(void)
-{
-    struct _clockperiod clkper;
-    // set clock period to 100 microseconds.
-    clkper.nsec       = 100000;		// 100K nanoseconds is 100 microseconds.
-    clkper.fract      = 0;
-    ClockPeriod (CLOCK_REALTIME, &clkper, NULL, 0);   // set it now.
-}
+	left.channel_id = 0;
+	timer_t timer_id = (timer_t) 0;
+	right.channel_id = 0;
 
-// Sets ALL digital I/O ports to be output ports and get a handle to Digital I/O Port A
-static void setup_dio(void)
-{
-	//Digital I/O and D/A Control register at offset 11
-	uintptr_t d_i_o_control_handle = mmap_device_io(1, BASE_ADDRESS + 0xb) ;
-	out8(d_i_o_control_handle, 0) ;	// sets the the DIR (direction bits) to outputs.
-	d_i_o_port_a_handle = mmap_device_io(1, BASE_ADDRESS + 0x8) ;	// Digital I/O Port A
-}
+	timer_id = create_pulse_timer(&left.channel_id);
+	struct _pulse pulse;
 
-// This creates a channel that is returned via the ptr_channel_id parameter.
-// We use this channel when we wait for a pulse from the timer.
-// Note that this returns the channel ID created by this function.
-static timer_t create_pulse_timer(int *ptr_channel_id)
-{
-    timer_t timer_id = 0 ;
- 	int pulse_id = 1234 ;	// arbitrary data value to pass with the pulse.
-    struct sigevent event;
+	int *timer_value;
+	timer_value = 40 * 100000;
+	// this will start the timer with said duty cycle
+	// this should really happen in master_loop
+	start_timer(timer_id, 0, &timer_value, 0, &timer_value);
+	// infinite loop for debugging
+	while(1){
+		// when received, the interrupt has occurred
+		//out8(d_i_o_port_a_handle, 0xff);
+		//MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);
+		//out8(d_i_o_port_a_handle, 0);
+		//MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);
 
-    *ptr_channel_id = ChannelCreate(0) ;		// Returns to calling program the channel that will get the timer event.
-
-    // from QNX example code in Programmers Guide
-    // Set up the timer and timer event.
-	// The only part we care about is that the notify is a SIGEV_PULSE and that the coid set to connect the channel to the timer.
-	// The rest is ignored.
-    event.sigev_notify            = SIGEV_PULSE;
-    event.sigev_coid              = ConnectAttach ( ND_LOCAL_NODE, 0, *ptr_channel_id, 0, 0 );
-    event.sigev_priority          = getprio(0) ;	// use our current priority.
-    event.sigev_code              = 1023;			// arbitrary number to identify this pulse source
-    event.sigev_value.sival_int   = pulse_id ;		// arbitrary value to pass with the pulse.
-
-    timer_create(  CLOCK_REALTIME, &event, &timer_id ) ;	// create but do not start the timer.
-    return timer_id ;
-}
-
-// Starts a periodic or one time timer depending on the values we use.
-void start_timer(time_t timer_id, int timeOutSec, int timeOutNsec, int periodSec, int periodNsec)
-{
-	struct itimerspec timer_spec;
-
-	timer_spec.it_value.tv_sec = timeOutSec;
-	timer_spec.it_value.tv_nsec = timeOutNsec;
-	timer_spec.it_interval.tv_sec = periodSec;
-	timer_spec.it_interval.tv_nsec = periodNsec;
-	timer_settime( timer_id, 0, &timer_spec, NULL );
+		// when received, the interrupt has occurred
+		/*start_timer(timer_id, 0, 100000 * 100, 0, 100000 * 100);
+		out8(d_i_o_port_a_handle, 0xff);
+		MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);
+		out8(d_i_o_port_a_handle, 0);
+		MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);*/
+	}
 }
 
 // Loop forever getting a pulse based on what we set for the timer.
@@ -72,7 +49,6 @@ void start_timer(time_t timer_id, int timeOutSec, int timeOutNsec, int periodSec
 void timer_demo(int channel_id)
 {
 	struct _pulse pulse ;
-	int count = 0 ;
 	static unsigned int pwm_pulse_counter = 0 ;
 	static unsigned int counter = 0 ;
 
@@ -119,38 +95,61 @@ void timer_demo(int channel_id)
 }
 
 
-int setup_timer(void)
+
+// This creates a channel that is returned via the ptr_channel_id parameter.
+// We use this channel when we wait for a pulse from the timer.
+// Note that this returns the channel ID created by this function.
+timer_t create_pulse_timer(int *ptr_channel_id)
 {
-	int channel_id = 0;
-	timer_id = create_pulse_timer(&channel_id);
-	start_timer(timer_id, 0, 100000, 0, 100000);
-	/*
-	int channel_id = 0;
-	timer_t timer_id = (timer_t) 0;
-	int privity_err;
+    timer_t timer_id = 0 ;
+ 	int pulse_id = 1234 ;	// arbitrary data value to pass with the pulse.
+    struct sigevent event;
 
-	//Give this thread root permissions to access the hardware
-	privity_err = ThreadCtl(_NTO_TCTL_IO, NULL);
-	if (privity_err == -1)
-	{
-		fprintf(stderr, "can't get root permissions\n");
-		return -1 ;
-	}
-	set_system_clock_period();		// set to 100 microseconds clock tick.
-	setup_dio();
+    *ptr_channel_id = ChannelCreate(0) ;		// Returns to calling program the channel that will get the timer event.
 
-	// create the pulse timer
-	timer_id = create_pulse_timer(&channel_id);
+    // from QNX example code in Programmers Guide
+    // Set up the timer and timer event.
+	// The only part we care about is that the notify is a SIGEV_PULSE and that the coid set to connect the channel to the timer.
+	// The rest is ignored.
+    event.sigev_notify            = SIGEV_PULSE;
+    event.sigev_coid              = ConnectAttach ( ND_LOCAL_NODE, 0, *ptr_channel_id, 0, 0 );
+    event.sigev_priority          = getprio(0) ;	// use our current priority.
+    event.sigev_code              = 1023;			// arbitrary number to identify this pulse source
+    event.sigev_value.sival_int   = pulse_id ;		// arbitrary value to pass with the pulse.
 
-	unsigned int time_value = 0;
-	printf("\nSuggested value is 100000 to pulse every 100 microseconds\n");
-	printf("\nEnter number of nanoseconds for the base counter: ");
-	scanf("%u", &time_value);
-	// Now set up the timer
-	start_timer(timer_id, 0, time_value, 0, time_value);
-	timer_demo(channel_id);	// run the crude PWM demo
-	*/
+    timer_create(CLOCK_REALTIME, &event, &timer_id) ;	// create but do not start the timer.
+    return timer_id ;
+}
 
 
-	return 0;
+// Starts a periodic or one time timer depending on the values we use.
+void start_timer(time_t timer_id, unsigned int *timeOutSec, unsigned int *timeOutNsec, unsigned int *periodSec, unsigned int *periodNsec)
+{
+	struct itimerspec timer_spec;
+
+	timer_spec.it_value.tv_sec = timeOutSec;
+	timer_spec.it_value.tv_nsec = timeOutNsec;
+	timer_spec.it_interval.tv_sec = periodSec;
+	timer_spec.it_interval.tv_nsec = periodNsec;
+
+	timer_settime( timer_id, 0, &timer_spec, NULL );
+}
+
+// Sets ALL digital I/O ports to be output ports and get a handle to Digital I/O Port A
+void setup_dio(void)
+{
+	//Digital I/O and D/A Control register at offset 11
+	uintptr_t d_i_o_control_handle = mmap_device_io(1, BASE_ADDRESS + 0xb) ;
+	out8(d_i_o_control_handle, 0) ;	// sets the the DIR (direction bits) to outputs.
+	d_i_o_port_a_handle = mmap_device_io(1, BASE_ADDRESS + 0x8) ;	// Digital I/O Port A
+}
+
+// This function changes the QNX system clock tick size to just 100 microseconds.
+void set_system_clock_period(void)
+{
+    struct _clockperiod clkper;
+    // set clock period to 100 microseconds.
+    clkper.nsec       = 100000;		// 100K nanoseconds is 100 microseconds.
+    clkper.fract      = 0;
+    ClockPeriod (CLOCK_REALTIME, &clkper, NULL, 0);   // set it now.
 }

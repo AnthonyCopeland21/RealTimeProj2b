@@ -39,12 +39,11 @@ typedef struct {
 
 
 int start(void);
-static void set_system_clock_period(void);
-static void setup_dio(void);
-static timer_t create_pulse_timer(int *ptr_channel_id);
-void start_timer(time_t timer_id, int timeOutSec, int timeOutNsec, int periodSec, int periodNsec);
+void set_system_clock_period(void);
+void setup_dio(void);
+timer_t create_pulse_timer(int *ptr_channel_id);
+void start_timer(time_t timer_id, unsigned int *timeOutSec, unsigned int *timeOutNsec, unsigned int *periodSec, unsigned int *periodNsec);
 void timer_demo(int channel_id);
-int setup_timer(void);
 
 
 #endif  // STARTUP_H
