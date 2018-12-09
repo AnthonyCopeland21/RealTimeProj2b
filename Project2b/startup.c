@@ -1,10 +1,44 @@
 #include "startup.h"
 
-static uintptr_t d_i_o_port_a_handle ;	// digital I/O port handle
+static uintptr_t d_i_o_port_a_handle;	// digital I/O port A handle
+static uintptr_t d_i_o_port_b_handle;	// digital I/O port B handle
 static Servo left;
 static Servo right;
 
+void *timer_running(void *args){
+	struct itimerspec timer_spec;
+	left.position = 4;
+
+	// timing interval of 100us
+	timer_spec.it_value.tv_sec = 0;
+	timer_spec.it_value.tv_nsec = 100000;
+	timer_spec.it_interval.tv_sec = 0;
+	timer_spec.it_interval.tv_nsec = 100000;
+
+	timer_t timer_id = create_pulse_timer(&left.channel_id);
+	timer_settime(timer_id, 0, &timer_spec, NULL);
+
+	struct _pulse pulse;
+	static unsigned int counter = 0;
+
+	while(1) {
+		MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);
+		if(counter++ > 200) {
+			counter = 0;
+		}
+		if(counter < left.position)
+			out8(d_i_o_port_a_handle, 0xff);
+		else
+			out8(d_i_o_port_a_handle, 0);
+	}
+
+
+	pthread_exit(NULL);
+}
+
 int start(void){
+
+
 	int privity_err;
 	privity_err = ThreadCtl(_NTO_TCTL_IO, NULL);
 	if (privity_err == -1)
@@ -16,31 +50,17 @@ int start(void){
 	setup_dio();
 
 	left.channel_id = 0;
-	timer_t timer_id = (timer_t) 0;
 	right.channel_id = 0;
+	pthread_t id;
 
-	timer_id = create_pulse_timer(&left.channel_id);
-	struct _pulse pulse;
 
-	int *timer_value;
-	timer_value = 40 * 100000;
+
 	// this will start the timer with said duty cycle
 	// this should really happen in master_loop
-	start_timer(timer_id, 0, &timer_value, 0, &timer_value);
-	// infinite loop for debugging
-	while(1){
-		// when received, the interrupt has occurred
-		//out8(d_i_o_port_a_handle, 0xff);
-		//MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);
-		//out8(d_i_o_port_a_handle, 0);
-		//MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);
+	pthread_create(&id, NULL, &timer_running, NULL);
 
-		// when received, the interrupt has occurred
-		/*start_timer(timer_id, 0, 100000 * 100, 0, 100000 * 100);
-		out8(d_i_o_port_a_handle, 0xff);
-		MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);
-		out8(d_i_o_port_a_handle, 0);
-		MsgReceivePulse(left.channel_id, &pulse, sizeof(pulse), NULL);*/
+	// infinite loop for user interface?
+	while(1){
 	}
 }
 
@@ -123,7 +143,7 @@ timer_t create_pulse_timer(int *ptr_channel_id)
 
 
 // Starts a periodic or one time timer depending on the values we use.
-void start_timer(time_t timer_id, unsigned int *timeOutSec, unsigned int *timeOutNsec, unsigned int *periodSec, unsigned int *periodNsec)
+void start_timer(time_t timer_id, int timeOutSec, int timeOutNsec, int periodSec, int periodNsec)
 {
 	struct itimerspec timer_spec;
 

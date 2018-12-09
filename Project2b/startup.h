@@ -11,6 +11,7 @@ typedef struct {
 	int loop_count;
 	int loop_end;
 	int running_status;
+
 	int channel_id;
 } Servo;
 
@@ -37,12 +38,13 @@ typedef struct {
 #define COUNT_20MS (200)
 #define PWM_SHORT_MEDIUM_LONG_CYCLE_RESET (200)
 
+void *timer_running(void *args);
 
 int start(void);
 void set_system_clock_period(void);
 void setup_dio(void);
 timer_t create_pulse_timer(int *ptr_channel_id);
-void start_timer(time_t timer_id, unsigned int *timeOutSec, unsigned int *timeOutNsec, unsigned int *periodSec, unsigned int *periodNsec);
+void start_timer(time_t timer_id, int timeOutSec, int timeOutNsec, int periodSec, int periodNsec);
 void timer_demo(int channel_id);
 
 
