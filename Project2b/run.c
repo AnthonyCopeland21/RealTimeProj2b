@@ -1,8 +1,12 @@
 #include "run.h"
 
+//GLOBAL VARIABLES
 static int done_waiting = 0;
 static int received_command = 0;
-//unsigned char recipe_servo1[] = {WAIT | 31, WAIT | 31, WAIT | 31};
+static uintptr_t d_i_o_port_a_handle;	// digital I/O port A handle
+static uintptr_t d_i_o_port_b_handle;	// digital I/O port B handle
+
+// OLD RECIPES
 //unsigned char recipe_servo1[] = {MOV, MOV | 5, MOV | 0, MOV | 3, LOOP, MOV | 0, MOV | 1, MOV | 4, END_LOOP, MOV, MOV | 2, MOV, WAIT, MOV | 3, WAIT, MOV | 2, MOV | 3, WAIT | 31, WAIT | 31, WAIT | 31, MOV | 4, RECIPE_END};
 //unsigned char recipe_servo1[] = {MOV | 4, SHIFT | 1, LOOP | 4, MOV | 1, WAIT | 1, MOV | 2, SHIFT, WAIT | 2, MOV | 3, END_LOOP, MOV | 5, RECIPE_END};  // Show Tony's grad command
 // unsigned char recipe_servo1[] = {MOV | 0, MOV | 1, SHIFT | 1, SHIFT, SHIFT | 1, JUMP | 10, WAIT | 10, WAIT | 5, WAIT | 31, MOV | 4, MOV | 5, RECIPE_END};                                         // Show Josh's grad command
@@ -10,18 +14,21 @@ static int received_command = 0;
 
 //unsigned char left_recipe[] = {MOV, MOV | 5, MOV | 0, MOV | 3, LOOP, MOV | 0, MOV | 1, MOV | 4, END_LOOP, MOV, MOV | 2, MOV, WAIT, MOV | 3, WAIT, MOV | 2, MOV | 3, WAIT | 31, WAIT | 31, WAIT | 31, MOV | 4, RECIPE_END};
 unsigned char left_recipe[] = {MOV, MOV | 1, MOV | 2, MOV | 3, MOV | 4, MOV | 5, WAIT | 31, WAIT | 31, WAIT | 31, MOV, RECIPE_END};
-unsigned char right_recipe[] = {MOV | 0, MOV | 1, SHIFT | 1, SHIFT, SHIFT | 1, JUMP | 10, WAIT | 10, WAIT | 5, WAIT | 31, MOV | 4, MOV | 5, RECIPE_END};
-
-static uintptr_t d_i_o_port_a_handle;	// digital I/O port A handle
-static uintptr_t d_i_o_port_b_handle;	// digital I/O port B handle
+unsigned char right_recipe[] = {LOOP | 2, MOV | 0, MOV | 1, MOV | 2, SHIFT | 1, SHIFT, SHIFT | 1, END_LOOP, JUMP | 13, WAIT | 10, WAIT | 5, WAIT | 31, MOV | 4, MOV | 5, RECIPE_END};
 
 
+// Purpose:		100ms Timing Thread
+// Input:		None
+// Output: 		None
 void *wait_for_done_thread(void *args){
 	usleep(200000);
 	done_waiting = 1;
 	pthread_exit(NULL);
 }
 
+// Purpose:		User Interface Thread
+// Input:		None
+// Output: 		None
 void *wait_for_command_thread(void *args){
 	char str[5];
 	printf(">");
@@ -67,6 +74,9 @@ void master_loop(void) {
 	}
 }
 
+// Purpose:		User Interface Parser
+// Input:		servo, left or right servo info
+// Output: 		None
 void parse_input(Servo servo){
 	if ((servo.command == 'b' || servo.command == 'B') && servo.status == -1){
 		start_recipe(servo);
@@ -87,6 +97,7 @@ void parse_input(Servo servo){
 
 // Purpose: 	Parse recipe command opcode
 // Input:		servo, struct Servo for servo to use
+//				recipe, the recipe being used for the servo
 // Output:		None
 void parse_command(Servo servo, unsigned char *recipe) {
 	if ((recipe[servo.count] & JUMP) == JUMP) {
@@ -123,6 +134,9 @@ void parse_command(Servo servo, unsigned char *recipe) {
 	}
 }
 
+// Purpose:		End of recipe for the servo
+// Input:		servo, servo to end recipe
+// Output: 		None
 void end_recipe(Servo servo) {
 	//printf("Ending recipe for servo %d\n", servo.channel_id);
 	if (servo.channel_id == left.channel_id){
@@ -303,7 +317,9 @@ void move_right_one(Servo servo) {
 	}
 }
 
-
+// Purpose:		PWM Timer control
+// Input:		args, carries channel_id
+// Output: 		None
 void *timer_running(void *args){
 	int channel_id = (int)args;
 	uintptr_t port_handle;
@@ -337,6 +353,9 @@ void *timer_running(void *args){
 	pthread_exit(NULL);
 }
 
+// Purpose:		Setup of timers, servo, and master loop
+// Input:		None
+// Output: 		None
 int start(void){
 
 	int privity_err;
@@ -368,6 +387,9 @@ int start(void){
 }
 
 
+// Purpose:		Setup of servos
+// Input:		None
+// Output: 		None
 void setup_servos(){
 	left.command = '\0';
 	left.position = 0;

@@ -17,7 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 
-// Struct for each servo
+// STRUCTS
 typedef struct {
 	char command;
 	int position;
@@ -30,32 +30,33 @@ typedef struct {
 	int channel_id;
 } Servo;
 
+// GLOBAL VARIABLES
 static Servo left;
 static Servo right;
 
-#define MOV (0x20)						// working
-#define RECIPE_END (0x00)				// working
-#define WAIT (0x40)						// working
-#define LOOP (0x80)						// working
-#define END_LOOP (0xA0)					// working
-#define SHIFT (0x60)					// Anthony's Command. Shift, 0 to shift right, 1 to shift left
+// CONSTANTS
+#define MOV (0x20)
+#define RECIPE_END (0x00)
+#define WAIT (0x40)
+#define LOOP (0x80)
+#define END_LOOP (0xA0)
+#define SHIFT (0x60)
 #define JUMP (0xC0)
-
-/*
-#define SPACING (300)
-#define LEFT_START (550)    //500
-#define RIGHT_START (550)   //750
-*/
 
 #define BASE_ADDRESS (0x280)
 #define COUNT_20MS (200)
 #define PWM_SHORT_MEDIUM_LONG_CYCLE_RESET (200)
 
 
+// Main Loop
 void master_loop(void);
 
+// Threads
+void *timer_running(void *args);
 void *wait_for_done_thread(void *args);
 void *wait_for_command_thread(void *args);
+
+// User Interface and servo control
 void parse_input(Servo servo);
 void parse_command(Servo servo, unsigned char *recipe);
 void pause_recipe(Servo servo);
@@ -69,7 +70,7 @@ void loop(Servo servo, int loop_count);
 void end_loop(Servo servo);
 void end_recipe(Servo servo);
 
-void *timer_running(void *args);
+// Starting up timers and servos
 void setup_servos();
 int start(void);
 void set_system_clock_period(void);
